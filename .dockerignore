@@ -1,0 +1,10 @@
+
+# Historique Git : inutile dans une image, et parfois lourd
+.git
+# Fichiers générés par Python, dans n'importe quel sous-dossier
+**/__pycache__
+**/*.pyc
+# Environnement virtuel Python local, s'il existe
+.venv
+# Secrets locaux : ne doivent JAMAIS finir dans une image
+.env
