@@ -1,0 +1,7 @@
+# Fichiers générés automatiquement par Python
+__pycache__/
+*.pyc
+# Environnement virtuel Python, s'il en existe un un jour
+.venv/
+# Fichiers de secrets locaux : à ne JAMAIS envoyer sur GitHub
+.env
