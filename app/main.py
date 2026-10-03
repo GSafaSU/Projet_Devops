@@ -60,7 +60,7 @@ def connexion_avec_table():
 @app.get("/")
 def accueil():
     return {
-        "message": "Bonjour depuis l'API du TP DevOps, version conteneurisée !",
+        "message": "Bonjour depuis l'API du TP DevOps, version compose !",
         "version": APP_VERSION,
         "hostname": socket.gethostname(),
     }

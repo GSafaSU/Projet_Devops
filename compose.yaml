@@ -1,0 +1,43 @@
+# Docker Compose : toute l'application décrite dans un seul fichier.
+# Chaque entrée sous « services » deviendra un conteneur.
+services:
+
+  # La base de données : l'image officielle de PostgreSQL, telle quelle
+  db:
+    image: postgres:18-alpine
+    environment:
+      # Lues au tout premier démarrage, pour créer l'utilisateur et la base
+      POSTGRES_USER: tasks
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Ajoute DB_PASSWORD dans le fichier .env}
+      POSTGRES_DB: tasks
+    volumes:
+      # Les données vivent dans un volume, en dehors du conteneur
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      # « La base accepte-t-elle les connexions réseau ? », toutes les 2 secondes
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "tasks", "-d", "tasks"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    
+  # L'API : construite à partir de ton Dockerfile
+  api:
+    build: .
+    image: tp-devops-api:2.0
+    ports:
+      - "8000:8000"
+    environment:
+      APP_VERSION: "2.0"
+      # « db » est le nom du service ci-dessus : le DNS de Docker le traduit en adresse IP
+      DB_HOST: db
+      DB_NAME: tasks
+      DB_USER: tasks
+      DB_PASSWORD: ${DB_PASSWORD:?Ajoute DB_PASSWORD dans le fichier .env}
+    depends_on:
+      db:
+        # L'API ne démarre qu'une fois la base déclarée en bonne santé
+        condition: service_healthy
+
+# Les volumes nommés : Docker les crée, et les garde d'un lancement à l'autre
+volumes:
+  pgdata:
