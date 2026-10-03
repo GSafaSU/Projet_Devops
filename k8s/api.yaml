@@ -1,0 +1,57 @@
+# L'API : trois copies de l'image publiée par la CI, derrière un seul point d'entrée
+
+# 1. Le Deployment : l'état voulu, que Kubernetes maintient en permanence
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      # Pas de variables automatiques du type DB_PORT=tcp://… : l'API les prendrait pour les siennes
+      enableServiceLinks: false
+      containers:
+        - name: api
+          image: ghcr.io/gsafasu/projet_devops:cd3ad2c
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DB_HOST
+              value: db
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: DB_PASSWORD
+          # « Es-tu vivant ? » En cas d'échecs répétés, le conteneur est redémarré
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+          # « Es-tu prêt ? » Sinon, le pod est retiré du Service, sans redémarrage
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            periodSeconds: 2
+---
+# 2. Le Service : répartit les requêtes entre les pods prêts, joignable depuis ton PC
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+spec:
+  type: NodePort
+  selector:
+    app: api
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
