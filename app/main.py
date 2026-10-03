@@ -72,7 +72,7 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/ready")
+@app.get("/readiness")
 def ready():
     # « Es-tu prêt à servir ? » Vérifie que la base répond.
     with connexion() as conn:
