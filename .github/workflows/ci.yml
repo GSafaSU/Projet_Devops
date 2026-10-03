@@ -16,7 +16,7 @@ jobs:
         run: ls -la
       
       - name: Récupérer le code du dépot
-        run: actions/checkout@v7
+        uses: actions/checkout@v7
       
       - name: Regarder le dossier de travail après le checkout 
         run: ls -la
