@@ -1,31 +1,36 @@
-# GitHub l'exécute à chaque push sur la branche main
+# Le pipeline CI/CD : GitHub l'exécute à chaque push sur main et à chaque pull request
 name: CI
 
 on:
   push:
     branches: [main]
+  pull_request:
 
 jobs:
-  decouverte:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dire bonjour
-        run: echo "Bonjour depuis une machine GitHub"
 
-      - name : Regarder le dossier de travail avant le checkout
-        run: ls -la
-      
-      - name: Récupérer le code du dépot
+  # Job 1 : l'application démarre-t-elle, et répond-elle ?
+  test:
+    runs-on: ubuntu-24.04
+    env:
+      # Mot de passe jetable : la base de test ne vit que le temps du job
+      DB_PASSWORD: mot-de-passe-de-test
+    steps:
+      - name: Récupérer le code du dépôt
         uses: actions/checkout@v7
-      
-      - name: Regarder le dossier de travail après le checkout 
-        run: ls -la
-      
-      - name: Explorer la machine
+
+      - name: Construire et démarrer la pile
+        run: docker compose up --build --wait
+
+      - name: Vérifier que l'API est prête
+        run: curl -sS --fail --retry 10 --retry-all-errors --retry-delay 2 http://localhost:8000/ready
+
+      - name: Créer une tâche
         run: |
-          whoami
-          cat /etc/os-release
-          nproc
-          free -h
-          docker version
-          docker compose version
+          curl -sS --fail -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title": "Test de la CI"}'
+
+      - name: Vérifier qu'elle est dans la liste
+        run: curl -sS --fail http://localhost:8000/tasks | grep "Test de la CI"
+
+      - name: Afficher les logs en cas d'échec
+        if: failure()
+        run: docker compose logs
