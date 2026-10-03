@@ -1,0 +1,31 @@
+# GitHub l'exécute à chaque push sur la branche main
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  decouverte:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dire bonjour
+        run: echo "Bonjour depuis une machine GitHub"
+
+      - name : Regarder le dossier de travail avant le checkout
+        run: ls -la
+      
+      - name: Récupérer le code du dépot
+        run: actions/checkout@v7
+      
+      - name: Regarder le dossier de travail après le checkout 
+        run: ls -la
+      
+      - name: Explorer la machine
+        run: |
+          whoami
+          cat /etc/os-release
+          nproc
+          free -h
+          docker version
+          docker compose version
