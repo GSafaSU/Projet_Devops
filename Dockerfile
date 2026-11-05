@@ -2,7 +2,7 @@
 FROM python:3.12-slim
 
 # Les logs de Python partent immédiatement, sans mise en tampon
-ENV PYTHONNUNBUFFERED=1
+ENV PYTHONUNBUFFERED=1
 
 # Un utilisateur sans privilèges, pour ne pas faire tourner l'API en root
 RUN useradd --create-home appuser
