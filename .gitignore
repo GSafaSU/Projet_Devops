@@ -5,3 +5,6 @@ __pycache__/
 .venv/
 # Fichiers de secrets locaux : à ne JAMAIS envoyer sur GitHub
 .env
+# Rapports de Robot Framework et archives d'images : recréés à chaque fois
+resultats/
+*.tar
