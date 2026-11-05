@@ -6,36 +6,100 @@ on:
     branches: [main]
   pull_request:
 
+# Par défaut, le jeton de GitHub ne peut que lire le dépôt ; publish demandera davantage
+permissions:
+  contents: read
+
 jobs:
 
-  # Job 1 : l'application démarre-t-elle, et répond-elle ?
-  test:
+  # Job 1 : construire l'image une seule fois, puis la transmettre aux autres jobs
+  build:
     runs-on: ubuntu-24.04
-    env:
-      # Mot de passe jetable : la base de test ne vit que le temps du job
-      DB_PASSWORD: mot-de-passe-de-test
     steps:
       - name: Récupérer le code du dépôt
         uses: actions/checkout@v7
 
-      - name: Construire et démarrer la pile
-        run: docker compose up --build --wait
-
-      - name: Vérifier que l'API est prête
-        run: curl -sS --fail --retry 10 --retry-all-errors --retry-delay 2 http://localhost:8000/ready
-
-      - name: Créer une tâche
+      - name: Construire l'image et l'exporter dans une archive
         run: |
-          curl -sS --fail -X POST http://localhost:8000/tasks -H "Content-Type: application/json" -d '{"title": "Test de la CI"}'
+          docker build -t tp-devops-api:ci .
+          docker save tp-devops-api:ci -o image.tar
 
-      - name: Vérifier qu'elle est dans la liste
-        run: curl -sS --fail http://localhost:8000/tasks | grep "Test de la CI"
+      - name: Transmettre l'archive aux jobs suivants
+        uses: actions/upload-artifact@v7
+        with:
+          name: image
+          path: image.tar
+          retention-days: 1
 
-      - name: Afficher les logs en cas d'échec
+  # Job 2 : cette image, déployée avec tes manifestes, passe-t-elle les tests d'acceptation ?
+  test:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Récupérer le code du dépôt
+        uses: actions/checkout@v7
+
+      - name: Récupérer l'archive de l'image
+        uses: actions/download-artifact@v8
+        with:
+          name: image
+
+      - name: Installer Kind et kubectl, en versions fixées et vérifiées
+        run: |
+          curl -fsSLO https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64
+          curl -fsSLO https://github.com/kubernetes-sigs/kind/releases/download/v0.33.0/kind-linux-amd64.sha256sum
+          sha256sum -c kind-linux-amd64.sha256sum
+          curl -fsSLO https://dl.k8s.io/release/v1.37.2/bin/linux/amd64/kubectl
+          curl -fsSLO https://dl.k8s.io/release/v1.37.2/bin/linux/amd64/kubectl.sha256
+          echo "$(cat kubectl.sha256)  kubectl" | sha256sum -c -
+          chmod +x kind-linux-amd64 kubectl
+          sudo mv kind-linux-amd64 /usr/local/bin/kind
+          sudo mv kubectl /usr/local/bin/kubectl
+
+      - name: Créer un cluster jetable, avec la configuration de ton PC
+        run: kind create cluster --name tp-devops --config kind-config.yaml --wait 120s
+
+      - name: Charger l'image dans les nœuds du cluster
+        run: kind load image-archive image.tar --name tp-devops
+
+      - name: Déployer l'application avec tes manifestes
+        run: |
+          kubectl create secret generic db-secret --from-literal=DB_PASSWORD=mot-de-passe-de-test
+          kubectl apply -f k8s/db.yaml
+          # api.yaml tel quel, sauf l'image : celle qu'on vient de construire
+          sed 's|image: .*|image: tp-devops-api:ci|' k8s/api.yaml | kubectl apply -f -
+          kubectl rollout status deployment/db --timeout=180s
+          kubectl rollout status deployment/api --timeout=180s
+
+      - name: Installer Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Installer Robot Framework
+        run: pip install -r tests/requirements.txt
+
+      - name: Tests d'acceptation
+        run: robot --outputdir resultats tests/
+
+      - name: Garder le rapport des tests, même en cas d'échec
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: rapport-robot
+          path: resultats/
+          retention-days: 7
+
+      - name: Afficher l'état du cluster en cas d'échec
         if: failure()
-        run: docker compose logs
+        run: |
+          kubectl get pods -o wide
+          kubectl describe pods
+          kubectl logs -l app=api --prefix --tail=50
+          kubectl logs deployment/db --tail=50
 
-  # Job 2 : publier l'image sur le registre de GitHub, seulement si le job 1 a réussi
+  # Job 3 : publier exactement l'image testée, si le test a réussi, et seulement sur main
   publish:
     needs: test
     if: github.ref == 'refs/heads/main'
@@ -44,17 +108,20 @@ jobs:
       contents: read
       packages: write
     steps:
-      - name: Récupérer le code du dépôt
-        uses: actions/checkout@v7
+      - name: Récupérer l'archive de l'image
+        uses: actions/download-artifact@v8
+        with:
+          name: image
 
       - name: Se connecter au registre ghcr.io
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+        env:
+          JETON: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$JETON" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
-      - name: Construire et publier l'image
+      - name: Étiqueter l'image testée et la publier
         run: |
-          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
-          TAG="${GITHUB_SHA::7}"
-          docker build -t "$IMAGE:$TAG" -t "$IMAGE:latest" .
-          docker push "$IMAGE:$TAG"
-          docker push "$IMAGE:latest"
-          echo "Image publiée : $IMAGE:$TAG"
+          docker load -i image.tar
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}:${GITHUB_SHA::7}"
+          docker tag tp-devops-api:ci "$IMAGE"
+          docker push "$IMAGE"
+          echo "Image publiée : $IMAGE"
