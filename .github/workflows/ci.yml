@@ -98,10 +98,26 @@ jobs:
           kubectl describe pods
           kubectl logs -l app=api --prefix --tail=50
           kubectl logs deployment/db --tail=50
-
-  # Job 3 : publier exactement l'image testée, si le test a réussi, et seulement sur main
+  
+  # Job 3 : l'image contient-elle une faille grave, qu'une mise à jour corrigerait ?
+  scan:
+    needs : build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Récupérer l'archive de l'image
+        uses: actions/download-artifact@v8
+        with:
+          name: image
+        
+      - name: Analyser l'archive avec Trivy
+        run: |
+          docker run --rm -v "$PWD/image.tar:/image.tar:ro" \
+            aquasec/trivy:0.76.1@sha256:790fd66d1697395d8693d1acaa1ea702406a20f109b6fc7bac8db623eca6c06c \
+            image --input /image.tar --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+  
+  # Job 4 : publier exactement l'image testée et analysée, si tout est vert, et seulement sur main
   publish:
-    needs: test
+    needs: [test, scan]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
