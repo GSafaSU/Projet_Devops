@@ -1,6 +1,8 @@
 # Image de base : une Debian minimale avec Python 3.12 déjà installé
 FROM python:3.12-slim
 
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 # Les logs de Python partent immédiatement, sans mise en tampon
 ENV PYTHONUNBUFFERED=1
 
