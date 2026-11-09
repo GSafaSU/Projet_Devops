@@ -11,7 +11,7 @@ RUN useradd --create-home appuser
 WORKDIR /app
 
 # D'abord les dépendances (elles changent rarement : mises en cache)
-COPY app/requirments.txt .
+COPY app/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Ensuite le code (il change souvent)
