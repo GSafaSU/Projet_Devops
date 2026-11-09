@@ -86,7 +86,7 @@ def lister_taches():
         return conn.execute("SELECT id, title, done FROM tasks ORDER BY id").fetchall()
 
 
-@app.post("/tasks", status_code=200)
+@app.post("/tasks", status_code=201)
 def creer_tache(tache: NouvelleTache):
     with connexion_avec_table() as conn:
         return conn.execute(
