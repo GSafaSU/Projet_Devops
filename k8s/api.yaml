@@ -19,7 +19,7 @@ spec:
       enableServiceLinks: false
       containers:
         - name: api
-          image: ghcr.io/gsafasu/projet_devops:cd3ad2c
+          image: ghcr.io/gsafasu/projet_devops:09f8b72
           ports:
             - containerPort: 8000
           env:
