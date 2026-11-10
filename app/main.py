@@ -4,6 +4,7 @@ import socket
 
 import psycopg
 from fastapi import FastAPI, HTTPException
+from prometheus_fastapi_instrumentator import Instrumentator
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
@@ -20,6 +21,10 @@ DB_CONFIG = {
 }
 
 app = FastAPI(title="TP DevOps - API de tâches", version=APP_VERSION)
+
+# Mesures pour Prometheus : nombre et durée des requêtes, publiés sur /metrics
+Instrumentator(excluded_handlers=["/metrics"]).instrument(app).expose(app)
+
 table_prete = False
 
 

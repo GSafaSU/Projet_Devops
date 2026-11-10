@@ -28,6 +28,10 @@ Une tâche créée apparaît dans la liste
     ${liste}=    GET    ${ADRESSE}/tasks    expected_status=200
     Should Contain    ${liste.text}    ${titre}
 
+Les mesures sont publiées pour Prometheus
+    ${reponse}=    GET    ${ADRESSE}/metrics    expected_status=200
+    Should Contain    ${reponse.text}    http_requests_total
+
 Une tâche sans titre est refusée
     ${corps}=    Create Dictionary
     POST    ${ADRESSE}/tasks    json=${corps}    expected_status=422
