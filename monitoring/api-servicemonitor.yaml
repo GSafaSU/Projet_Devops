@@ -1,0 +1,19 @@
+# Dit à Prometheus de lire /metrics sur chaque pod qui se trouve derrière le Service « api »
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api
+  labels:
+    # Le Prometheus installé par Helm ne prend que les objets qui portent
+    # l'étiquette release de son installation, ici « monitoring »
+    release: monitoring
+spec:
+  # Les Services qui portent cette étiquette : le Service « api »
+  selector:
+    matchLabels:
+      app: api
+  endpoints:
+    # Le port nommé « http » du Service
+    - port: http
+      path: /metrics
+      interval: 15s
