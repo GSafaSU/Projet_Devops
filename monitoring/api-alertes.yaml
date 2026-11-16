@@ -1,0 +1,32 @@
+# Les règles d'alerte de l'API, que Prometheus évalue en continu
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: api-alertes
+  labels:
+    # Même étiquette que le ServiceMonitor : sans elle, Prometheus ignore ces règles
+    release: monitoring
+spec:
+  groups:
+    - name: tp-devops
+      rules:
+        # Kubernetes ne compte plus aucun pod de l'API prêt : le service est coupé
+        - alert: APIAucunPodPret
+          expr: kube_deployment_status_replicas_available{namespace="default", deployment="api"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Aucun pod de l'API n'est prêt depuis 1 minute : le service est coupé"
+
+        # Les pods sont prêts, mais plus de 5 % des requêtes (hors sondes de
+        # Kubernetes) finissent en erreur serveur
+        - alert: TauxErreursEleve
+          expr: |
+            sum(rate(http_requests_total{job="api", status="5xx", handler!~"/health|/ready"}[1m]))
+              / sum(rate(http_requests_total{job="api", handler!~"/health|/ready"}[1m])) > 0.05
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Plus de 5 % des requêtes de l'API finissent en erreur 5xx"
